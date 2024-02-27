@@ -1,0 +1,32 @@
+project:
+  type: website
+  output-dir: docs
+  render:
+  - "*.qmd"
+  - "*.Rmd"
+  - "!backlog/"
+
+website:
+  title: "Hands on GEE"
+  sidebar:
+    style: "docked"
+    search: false
+    contents:
+      - index.qmd
+      - gee_introduction.qmd
+
+
+
+number-depth: 0
+
+format:
+  html:
+    theme: materia
+    number-sections: false
+    grid:
+      sidebar-width: 350px
+execute: 
+  echo: false
+  warning: false
+  message: false
+

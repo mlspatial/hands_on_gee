@@ -1,0 +1,279 @@
+---
+title:  "Getting Started"
+---
+
+## Setup
+
+
+* Make sure you have a Google Account.
+* Go to [https://code.earthengine.google.com](https://code.earthengine.google.com/)
+
+* Make yourself familiar wit the Google Earth Engine interface.
+* You should find the following GEE Web Editor Functionalities:
+	* Scripts, Docs, Assets
+	* Code editor
+	* Inspector, Console, Tasks
+	* Map
+
+* Download the [example shapefile of the Amtsvenn](./data/amtsvenn.zip)
+
+* Upload it as a asset in Google Earth Engine.
+  * Assets
+  * Add a project
+  * New -> Shapefile -> Amtsvenn.zip
+  * Klick on it to get its path
+
+## Feature collections
+
+Feature collections in GEE are essentially vector data (e.g. our Amtsvenn Shape).
+You can load and visualize a feature collection with the following code snippet.
+Please note that in my Example, the project where my asset is stored is called 'gee-tutorial' and your path might be different.
+
+
+```js
+var aoi = ee.FeatureCollection("projects/gee-tutorial/assets/amtsvenn");
+
+print("Amtsvenn", aoi)
+Map.addLayer(aoi, {}, "Amtsvenn")
+
+var vis = {color: "red"} // {} is a dictionary in javascript
+Map.addLayer(aoi, vis, "Amtsvenn in red")
+```
+
+
+
+:::: {.column-margin}
+:::{.callout-note}
+## var
+To declare a new variable in java script use the term `var` before the variable name.
+:::
+
+:::{.callout-note}
+## console output
+`print` outputs something in the Console tab.
+
+:::
+:::{.callout-note}
+## map output
+`Map.addLayer` uses three input parameters in this example:
+* the object to visualize
+* visualization parameters (as a dictionary)
+* the layer name
+Use the Docs panel and search for `Map.addLayer` in order to find more information.
+
+:::
+::::
+
+
+## Image collections
+
+Image collections are why we want to use GEE in the first place. An Image collection is basically the entire *collection* of satellite images of a certain sensor.
+E.g. the image collection "LANDSAT/LC08/C02/T1_L2" consists of all the Landsat 5 images from 1984 to 2012 of the entire globe. One such image can then consist of multiple bands, in the Landsat 5 case, the surface reflectance of certain wavelengths.
+Every image collections has a description page [e.g. for the L8 collection](https://developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2). You can find an overview of existing image collection in the [Dataset Catalogue](https://developers.google.com/earth-engine/datasets).
+
+
+```js
+
+var aoi = ee.FeatureCollection("projects/gee-tutorial/assets/amtsvenn");
+
+// load full image collection: doesnt work, to big
+var l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+print(l8, "Full Landsat")
+
+```
+
+The first thing we want to do is using `filter` functions to reduce the Image Collection to only include images that are in the area and time frame we want to investigate.
+
+
+```js
+
+var aoi = ee.FeatureCollection("projects/gee-tutorial/assets/amtsvenn");
+
+// built in filter functions
+var l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+  .filterBounds(aoi)
+  .filterDate("2021-01-01", "2021-12-01")
+
+
+print(l8, "Amtsvenn Landsat")
+Map.addLayer(l8, {}, "Amtvenn")
+
+```
+
+:::: {.column-margin}
+:::{.callout-note}
+## daisy chain
+You can use the `.` to chain functions together
+
+:::
+::::
+
+In the Console output you can see, that there are 24 images left in the collection after the filtering.
+If you have a look at the map, you can also see that two neighboring Landsat Images in the Collection contain parts of the Amtsvenn. Here, the structure of an GEE Image Collection gets clear. We did not crop any image with `filterBound`. The Landsat Images are still in the collection in their full extent.
+
+
+If you have a look at the console output again, click on the printed Image Collection. You can see that the Image Collection has `features` and `properties`. The `features` of an image collection are the images, so in this case, the 24 Landsat 8 scenes of 2021 for the Amtsvenn area. The `properties` are metadata, so in this case, information about the image collection.
+
+If you click on `features`, you can get a list of the images in the collection. Click on one image. Now you can see, that the image has `bands` and `properties`. In this example, each Landsat 8 image has 19 bands and 92 properties. Again, `properties` contains metadata for each image, e.g. `DATE_ACQUIRED`. These image properties (NOT image collection properties) we can use for additional filtering. For example to implement a simple cloud threshold with the property `CLOUD_COVER`:
+
+
+```js
+// filter functions based on image properties
+var l8_cloudfree = l8.filter(ee.Filter.lt('CLOUD_COVER', 30))
+print(l8_cloudfree, "Amtsvenn Cloudfree")
+
+```
+
+To reduce each image to specific bands, you can use the `select` function.
+
+
+
+```js
+// filter functions based on image properties
+var l8_bands = l8_cloudfree.select("SR_B4", "SR_B5")
+print(l8_bands, "Amtsvenn bands 4 & 5")
+
+```
+
+
+## Vegetation indices
+
+To calculate a vegetation index (e.g. the old faithful NDVI) there is the function `normalizedDifference`. If you search for this function in the docs panel, it gives you the following description:
+
+> Computes the normalized difference between two bands. If the bands to use are not specified, uses the first two bands. The normalized difference is computed as (first − second) / (first + second)
+
+It is important to understand that the `normalizedDifference` function works with an `image` as you can see by the argument `this:input (Image): The input image`.
+Applying the normalized difference function to a `ImageCollection` will not work. 
+
+
+```js
+
+// normalizedDifference on a imageCollection will throw an error:
+// var ndvi_error = l8_bands.normalizedDifference(["SR_B4", "SR_B5"])
+
+
+var ndvi = l8_bands.first().normalizedDifference(["SR_B4", "SR_B5"])
+
+print(ndvi, "NDVI single image")
+Map.addLayer(ndvi, {}, "NDVI")
+```
+
+
+:::: {.column-margin}
+:::{.callout-note}
+## first
+The `.first()` function will simply return the first image in the image collection.
+:::
+::::
+
+### Map functions
+
+In order to apply a function to all the images in the image collection, we have to use the `.map` function.
+The clearest way to use `.map` is to define a function beforehand with an image as an input argument and a return as in the following code snippet.
+
+```js
+// define function for NDWI for one image
+var ndvi_function = function(img){
+  var ndvi = img.normalizedDifference(["SR_B4", "SR_B5"]).rename("NDVI")
+  return img.addBands(ndvi)
+}
+
+
+// apply function to the first image
+var ndvi = l8_bands.first().ndvi_function()
+print(ndvi, "NDVI single image")
+Map.addLayer(ndvi, {}, "B4, B5, NDVI")
+```
+
+:::: {.column-margin}
+:::{.callout-note}
+## rename
+With `.rename` you can give a new name to a band
+:::
+
+:::{.callout-note}
+## return
+`return img.addBands(ndvi)` means, that the output of this function is the original image with an added ndvi band.
+:::
+::::
+
+
+
+
+The defined `ndvi_function` can then be applied to all images in the image collection with `.map` like this:
+
+
+```js
+// apply the function to all the images with map
+var l8_ndvi = l8_bands.map(ndvi_function)
+print(l8_ndvi)
+```
+
+## Export
+
+If you search for "Export" in the docs panel, you should see that a `ImageCollection` cannot be exported out of Google Earth Engine. Instead, we have to convert out image collection to a single image (with multiple bands) in order to Export it to Google Drive, where we then can download the image for further analysis. With `clip` we also can finally reduce the image to just our area of interest. If you use `Export.image.toDrive` and your script works without error, the tasks panel should turn yellow and a new export task should appear there. Click on `Run` to actually start your script on the Google Servers and create an output in your Google Drive.
+
+```js
+var l8_export = l8_ndvi.select(NDVI)
+                  .sort("system:time_start")
+                  .toBands()
+                  .clip(aoi)
+
+Export.image.toDrive(
+  {image: l8_export,
+  scale: 30,
+  region: aoi
+  }
+)
+
+
+```
+
+
+
+## Code Summary
+
+Here is a condensed version of this tutorial.
+
+```js
+
+// area of interest
+var aoi = ee.FeatureCollection("projects/gee-tutorial/assets/amtsvenn");
+
+// define function for ndvi for one image
+var ndvi_function = function(img){
+  var ndvi = img.normalizedDifference(["SR_B4", "SR_B5"]).rename("NDVI")
+  return img.addBands(ndvi)
+}
+
+
+// Image Collection filtering, select bands and calculate ndvi
+var l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+  .filterBounds(aoi)
+  .filterDate("2021-01-01", "2021-12-01")
+  .filter(ee.Filter.lt('CLOUD_COVER', 30))
+  .select("SR_B5", "SR_B6")
+  .map(ndvi_function)
+  .select("NDVI")
+
+
+print(l8, "ImageCollection")
+
+// image collection to multiband image
+var ndvi_ts = l8.sort("system:time_start").toBands().clip(aoi)
+
+print(ndvi_ts, "Multiband Image")
+Map.addLayer(ndvi_ts, {}, "NDVI) 
+
+// Export
+Export.image.toDrive(
+  {image: ndvi_ts,
+  scale: 30,
+  region: aoi
+  }
+)
+
+```
+
+
+

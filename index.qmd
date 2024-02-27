@@ -1,0 +1,16 @@
+# Home
+
+
+Learn the basics of Google Earth Engine and download a Landsat vegetation index time series from 1985 to today.
+
+
+**What is Google Earth Engine?**
+
+Google Earth Engine (GEE) is a cloud computing platform with which you can access, process and download remote sensing data products.
+
+
+**When is Google Earth Engine useful? to learn**
+
+Whenever the time you need to download and pre-process satellite imagery manually from e.g. the Earth Explorer is longer than to learn a few things about GEE and Java Script.
+
+## Get Started with the [Introduction to Google Earth Engine](gee_introduction.qmd)

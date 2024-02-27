@@ -1,0 +1,59 @@
+ 
+## 05_sampling
+
+```js
+var aoi = ee.FeatureCollection("projects/rsforum-tutorial/assets/amtsvenn");
+
+
+// define function for NDWI for one image
+var NDWI = function(img){
+  var ndwi = img.normalizedDifference(["SR_B5", "SR_B6"]).rename("NDWI")
+  return img.addBands(ndwi)
+}
+
+
+
+// apply the function to all the images with map
+var l8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+  .filterBounds(aoi)
+  .filterDate("2021-01-01", "2021-12-01")
+  .filter(ee.Filter.lt('CLOUD_COVER', 30))
+  .select("SR_B5", "SR_B6")
+  .map(NDWI)
+  .select("NDWI")
+
+
+print(l8, "ImageCollection")
+
+
+
+// image collection to multiband image
+var ndwi_ts = l8.sort("system:time_start").toBands().clip(aoi)
+
+// Image to table (extract)
+var ndwi_sample = ndwi_ts.sampleRegions(aoi)
+print(ndwi_sample, "Sample Regions")
+
+Export.table.toDrive({
+  collection: ndwi_sample
+})
+
+
+
+var l8Chart = ui.Chart.image.series(l8.select('NDWI'), aoi)
+  .setChartType('ScatterChart')
+  .setOptions({
+   title: 'Landsat 8 NDWI at Amtsvenn',
+   trendlines: {
+     0: {color: 'CC0000'}
+   },
+   lineWidth: 1,
+   pointSize: 3,
+  });
+print(l8Chart);
+
+
+
+
+```
+
